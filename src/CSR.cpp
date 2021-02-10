@@ -21,7 +21,7 @@ class CSR {
 		int currRow = 0; //value of the row member to which the last non-zero value was added
 		int valuesSize = 0; //value of the current number of nonZero values that have been added to values array
 		int colPosSize = 0; //value of the current number row values added to the colPos array
-		int valInRow = 0;//There may be others you may need
+		int valInRow = 0;//counts the number of times that a number is added to a row when the matrix is being filled
 
 	public:
 		CSR (); //default or empty constructor
@@ -93,31 +93,18 @@ CSR::CSR (CSR& martrixB){
 	colPosSize = martrixB.colPosSize;
 }
 
-int* CSR::matrixVectorMultiply (int* inputVector){
-	int* outputVector = new int [n];
-	int* rowVector;
+int* CSR::matrixVectorMultiply (int* inputVector){//multiplies a matrix of size nxm by a vector of lenght m
+	int* outputVector = new int [n];//initializing array that will be returned
+	int* rowVector;//array that will be used to temporaly store the row vectors of the matrix
 
 	for (int i=0; i < n; i++) outputVector[i] =0; // setting output vector values as 0
 
 	for (int i=0; i < n; i++){// moving through the rows values
-		rowVector = getRow(i + 1);
-			 for (int j= 0 ; j < m; j++) {
-				 outputVector[i] += rowVector[j] * inputVector[j];
-			 }
-		delete [] rowVector;
+		rowVector = getRow(i + 1); //obtaining row (i+1) from the matrix
+		outputVector[i] = dotProduct(rowVector, inputVector, m); //calculates the dot product between the row vector and the input vector
+		delete [] rowVector;//deletes content of the pointer object
 	}
 
-	/*
-	for (int i=0; i < n; i++) outputVector[i] =0; // setting output vector values as 0
-
-	for (int i=0; i < n; i++){// moving through the rows values
-		 for (int j=rowPtr[i]; j < rowPtr[i+1]; j++) { // obtaining the range of non-zero values within the row
-			 outputVector[i] = outputVector[i] + values[j] * inputVector[colPos[j]];
-			 // addition of the multiplication of non-zero values within the row, the value that multiplies them is
-			 // found within the input vector at the index given by the colPos array
-		 }
-	}
- */
 	return outputVector;
 }
 
@@ -137,7 +124,14 @@ CSR::~CSR ( ) {
 	colPosSize = 0;
 }
 
-int* CSR::getColumnVector(int col) {		//all rows of column col
+/**
+ * This method will help you fetch a column of values from the matrix
+ *
+ * Provided the column number as an argument,
+ * the method returns an array which contains the column values.
+ *
+ */
+int* CSR::getColumnVector(int col) {//all rows of column col
 	int *colVector = new int[n];
 	int r;
 	for (int i = 0; i < n; i++)
@@ -173,6 +167,13 @@ int* CSR::getColumnVector(int col) {		//all rows of column col
 	return colVector;
 }
 
+/**
+ * This method will help you fetch a row of values from the matrix
+ *
+ * Provided the row number as an argument,
+ * the method returns an array which contains the row values.
+ *
+ */
 int* CSR::getRowVec(int row) {
 
 	int *vector = new int[n];
@@ -199,167 +200,146 @@ int* CSR::getRowVec(int row) {
 }
 
 
-CSR* CSR::matrixMultiply(CSR& matrixB){
-	int nonZeroes = n * matrixB.m;
-	int* rowVector;
-	int* columnVector;
-	CSR* result = new CSR();
+CSR* CSR::matrixMultiply(CSR& matrixB){//multiplies a matrix of size nxm by another matrix of size mxi the result will be a matrix of size nxi
+	int nonZeroes = n * matrixB.m; //maximun number of values that the matrix can hold
+	int* rowVector; //array pointer to rows extracted from the matrix on wich the method is called
+	int* columnVector; //array pointer to columns extracted from the matrix obtained as a parameter
+	CSR* result = new CSR(); //initializing the matrix which will be returned
 
+	//initializing the resulting matrix variables
 	result->values = new int[nonZeroes];
 	result->colPos = new int[nonZeroes];
 	result->rowPtr = new int[n];
 
-	result->n = n;
-	result->m = matrixB.m;
-	result->nonZeros = nonZeroes;
+	result->n = n; //resultant number of rows equivalent to the number of rows in the caller matrix type object
+	result->m = matrixB.m;//resultant number of columns equivalent to the number of columns in the parameter matrix
+	result->nonZeros = nonZeroes; //number of nonZeroes initialized to its maximun predicted value
 
-	for (int i = 0 ; i < nonZeroes ; i ++) {
+	for (int i = 0 ; i < nonZeroes ; i ++) {//filling arrays wit zeroes
 		result->values[i] = 0;
 		result->colPos[i] = 0;
 	}
 
-	for (int i = 0 ; i < result->n; i++){
+	for (int i = 0 ; i < result->n; i++){//filling array with maximun number of nonZeroes
 		result->rowPtr[i] = nonZeroes;
 	}
 
 	int dot = 0;
 
-	int zeroes;
-	int* rowOfZeroes = new int[result->n];
+	int zeroes; //counter variable that will be used to check if the row in the result matrix is filled with zeroes
+	int* rowOfZeroes = new int[result->n]; //this array will be filled with 1 and 0s to determined if a given row is filled with zeroes
+											// the index of the array is equivalent to the row number - 1
+	for (int row = 0; row < n; row++){//initializing multiplication
+		zeroes = 0;//restarting count to zero
+		rowVector = getRowVec(row);//obtaining row from calling matrix
 
-	for (int row = 0; row < n; row++){
-		zeroes = 0;
-		rowVector = getRowVec(row);
+		for (int column = 0; column < matrixB.m; column++){//running through the columns in the parameter matrix
 
-		for (int column = 0; column < matrixB.m; column++){
+			columnVector = matrixB.getColumnVector(column);//obtaining a column from the parameter matrix
+			dot = dotProduct(rowVector, columnVector, m); //calculating dot product between the row and the column
 
-			columnVector = matrixB.getColumnVector(column);
-			dot = dotProduct(rowVector, columnVector, m);
-
-			if (dot != 0){
-
-				/*cout << "Row: " << row << endl;
-				displayArray(rowVector, n);
-				cout << "Column: " << column << endl;
-				displayArray(columnVector, matrixB.m);
-				cout << endl << "Dot product: " << dot << endl << endl;*/
-
+			if (dot != 0){//checking if the resultant value of the produt was zero or not and adding it to the matrix
 				result->addValue(dot);
 				result->addRow(row);
 				result->addColumn(column);
-			} else {
+			} else {//if the cvalue was zero the counter for zeroes is increased by one
 				zeroes++;
 			}
 		}
 
-		if (zeroes == result->n) rowOfZeroes[row] = 1;
-		else  rowOfZeroes[row] = 0;
+		if (zeroes == result->n) rowOfZeroes[row] = 1; //checks if the the given row multiplication result is a row full of zeros
+		else  rowOfZeroes[row] = 0; // if it is the array at the index of the given row is filled with 1, otherwise is filled with 0
 	}
 
-	for (int row = 0; row < n; row++){
-		if (rowOfZeroes[row] == 1){
+	for (int row = 0; row < n; row++){//going through the array of zeroes to check which rows are filled with zeroes
+		if (rowOfZeroes[row] == 1){//if the row is filled with zeroes the value within the rowPtr array will be changed
 			result->rowPtr[row] = result->valuesSize;
 		}
 	}
-	//result->displayArray(result->values, nonZeroes);
-	//result->nonZeros = result->valuesSize;
-	//cout << result->n << "x" << result->m << endl;
 	return result;
 }
 
-int CSR::dotProduct(int* vector1, int* vector2, int size){
+int CSR::dotProduct(int* vector1, int* vector2, int size){// calculates the dot product between two arrays of the same size
 	int result = 0;
 
 	for (int i = 0; i < size; i++){
 		result += vector1[i] * vector2[i];
 	}
+
 	return result;
 }
 
 void CSR::addValue (int value){
-	values[valuesSize] = value;
-	//cout << "Value has not been assigned to values[" << valuesSize << "]" << endl;
-	//cout << "Assigning the value: " << value << endl;
-	//cout << endl;
-	valuesSize++;
+	values[valuesSize] = value;//assings the value to the array
+	valuesSize++;//increases the index
 }
 
 void CSR::addColumn(int col){
-	colPos[colPosSize] = col;
-	//cout << "Value has not been assigned to colPos[" << colPosSize << "]" << endl;
-	//cout << "Assigning the value: " << col << endl;
-	//cout << endl;
-	colPosSize++;
+	colPos[colPosSize] = col;//assigns the calue to the array
+	colPosSize++;//increases the index
 }
 
-void CSR::addRow(int row){
-	if (currRow != row){
-		valInRow = 0;
+void CSR::addRow(int row){//adds the index of the first nonzero value in the row specified by the parameter within the values array
+	if (currRow != row){//checking first if the value that is being added is in the same or in a different row
+		valInRow = 0;//if it is a different row the counter of number of values in a row is restarted
 	}
 
-	if (valInRow == 0){
-		currRow = row;
-		valInRow++;
-		rowPtr[row] = valuesSize - 1;
+	if (valInRow == 0){//when the addRow method is called for the first time in a given row the method enters this statement
+		currRow = row; // assings the parameter value to the  current row.
+		rowPtr[row] = valuesSize - 1; // inputs the index of this first value in the values array
+									// because of this the addrow method has to be called after the addValue method has already been called
 	}
+
+	valInRow++; // increases the number of alues that have been inputed in this row
 }
 
-int* CSR::getRow(int row){//rows start counting from 1
+int* CSR::getRow(int row){//obtains a row from the matrix starting from 1
 
-	int index_start = rowPtr[row - 1];
-	int index_end = valuesSize;
+	int index_start = rowPtr[row - 1];//obtains the starting index of the nonzero present in the values array
+	int index_end = valuesSize; // sets the default ending index as the value before the last element filled
 
-	if (row != n){
+	if (row != n){ // if the row that is being extracted is not the last, the ending index is changed for the element that follows the one presen
+					// in the starting index
 		index_end = rowPtr[row];
 	}
 
 	//cout << "Index in array of values for row N." << row << " have a range of [" << index_start << ", " << index_end << ")" << endl;
 
-	int* rows = new int [m];
+	int* rows = new int [m];//generates a pointer array to present the row array
 
-	for (int col = 0; col < m; col++){
+	for (int col = 0; col < m; col++){ // filling the array with zeros
 		rows[col] = 0;
 	}
 
-	for (int index = index_start; index < index_end ; index++){
-		int colVal = colPos[index];
-		rows[colVal] = values[index];
+	for (int index = index_start; index < index_end ; index++){ // replacing the zero values with the nonZero values contained in the values array
+		int colVal = colPos[index];//obtaining the column index value
+		rows[colVal] = values[index];//using the column index value the value in values is assigned
 	}
-
-	/*
-	cout << "Extracted row N." << row << endl;
-	cout << "[ ";
-	for (int col = 0; col < m; col++){
-		cout << rows[col] << " ";
-	}
-	cout << "]" << endl << endl;
-	*/
-
 	return rows;
 }
 
-int* CSR::getColumn(int column){
-	int* vector = new int[n];
+int* CSR::getColumn(int column){ // gets a column array from the matrix
+	int* vector = new int[n]; //pointer object that will be returned
 
 	for (int i = 0; i < n; i++){
-		vector[i] = (getRow(i + 1))[column - 1];
+		vector[i] = (getRow(i + 1))[column - 1]; // obtaining the value in the column at the i row
 	}
 	//displayArray(vector, n);
 	return vector;
 }
 
-void CSR::displayArray(int* array, int size){
+void CSR::displayArray(int* array, int size){ // helper method made to dispay the diferent arrays
 	for(int i = 0; i < size; i++){
 		cout << array[i] << " ";
 	}
 	cout << endl;
 }
 
-void CSR::display(){
+void CSR::display(){ //display method to present the matrixes and its elements
 
 	int* tempRow;
 
-	for (int row = 0 ; row < n ; row++){
+	for (int row = 0 ; row < n ; row++){// prints out each row
 		tempRow = getRowVec(row);
 		displayArray(tempRow, m);
 		delete [] tempRow;
